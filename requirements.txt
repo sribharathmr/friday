@@ -1,0 +1,13 @@
+ollama
+SpeechRecognition
+pyaudio
+pyttsx3
+numpy
+vosk
+pywin32
+pywhatkit
+wikipedia
+requests
+speedtest-cli
+pycaw
+feedparser
