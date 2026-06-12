@@ -66,20 +66,16 @@ class Skills:
     def open_libreoffice(self, app):
         """Opens libreoffice suite applications"""
         app = app.lower()
-        if "calc" in app:
-            os.system("start excel") # fallback to excel if soffice isn't in path, but let's try soffice first
-            os.system("start soffice --calc")
-            return "Opening Calculator / Spreadsheets."
-        elif "writer" in app:
-            os.system("start winword")
-            os.system("start soffice --writer")
-            return "Opening Writer."
-        elif "impress" in app:
-            os.system("start powerpnt")
-            os.system("start soffice --impress")
-            return "Opening Impress."
-        else:
-            return "I don't know that application."
+        commands = {
+            "calc": "start soffice --calc",
+            "writer": "start soffice --writer",
+            "impress": "start soffice --impress"
+        }
+        for key, cmd in commands.items():
+            if key in app:
+                os.system(cmd)
+                return f"Opening {key.capitalize()}."
+        return "I don't know that application."
 
     def tell_about(self, topic):
         """Tells about something, by searching on the internet"""
@@ -139,10 +135,10 @@ class Skills:
     def check_internet(self):
         """Tells the internet availability"""
         try:
-            requests.get("https://8.8.8.8", timeout=2)
-            return "The internet connection is working perfectly."
-        except:
-            return "The internet connection appears to be offline."
+            requests.get("https://www.google.com", timeout=3)
+            return "Internet connection is live."
+        except requests.ConnectionError:
+            return "No internet connection detected."
 
     def get_news(self):
         """Tells the daily news"""
@@ -160,3 +156,37 @@ class Skills:
         """Spells a word"""
         spelled = "-".join(list(word.upper()))
         return f"{word} is spelled: {spelled}."
+
+    def open_app(self, app_name):
+        """Opens any application on the system"""
+        import subprocess
+        try:
+            subprocess.Popen(app_name, shell=True)
+            return f"Opening {app_name}."
+        except Exception as e:
+            return f"I couldn't find {app_name} on your system."
+
+    def take_screenshot(self):
+        """Takes a screenshot and saves it as a file"""
+        import pyautogui
+        filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        try:
+            pyautogui.screenshot(filename)
+            return f"Screenshot saved as {filename}."
+        except Exception as e:
+            return f"Failed to take screenshot: {e}"
+
+    def calculate(self, expression):
+        """Evaluates a mathematical expression safely"""
+        try:
+            # Extract math from text
+            expression = expression.lower().replace("times", "*").replace("plus", "+") \
+                                   .replace("minus", "-").replace("divided by", "/")
+            import re
+            clean_expr = re.sub(r'[^0-9+\-*/().\s]', '', expression)
+            if not clean_expr.strip():
+                return "I couldn't find a valid mathematical expression to calculate."
+            result = eval(clean_expr)
+            return f"The answer is {result}."
+        except Exception as e:
+            return "I couldn't calculate that."

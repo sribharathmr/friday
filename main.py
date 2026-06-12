@@ -2,60 +2,80 @@ from voice import VoiceEngine
 from brain import Brain
 from listener import Listener
 from skills import Skills
+from memory import Memory
 import re
 
-def parse_command(command, skills):
-    """Routes the voice command to a skill, or returns None if it should go to the AI brain"""
+def parse_command(command, skills, memory):
+    """Routes the voice command to a skill or memory store, or returns None if it should go to the AI brain"""
     cmd = command.lower()
     
-    if "open youtube" in cmd:
-        return skills.open_webpage("youtube")
-    elif "play" in cmd and "youtube" in cmd:
-        # e.g., "play mozart on youtube"
-        query = cmd.replace("play", "").replace("on youtube", "").strip()
-        return skills.play_music(query)
-    elif "volume" in cmd:
-        return skills.change_volume(cmd)
-    elif "open calc" in cmd or "open writer" in cmd or "open impress" in cmd:
-        return skills.open_libreoffice(cmd)
-    elif "tell me about" in cmd:
-        query = cmd.split("tell me about")[-1].strip()
-        return skills.tell_about(query)
-    elif "weather in" in cmd:
-        city = cmd.split("weather in")[-1].strip()
-        return skills.get_weather(city)
-    elif "time" in cmd or "date" in cmd:
-        # If they just ask generally about time or date, not part of a bigger sentence
-        if len(cmd.split()) < 5:
-            return skills.get_time_date(cmd)
-    elif "alarm" in cmd:
-        # Try to extract a number for seconds
-        match = re.search(r'\d+', cmd)
-        if match:
-            seconds = int(match.group())
-            return skills.set_alarm(seconds)
-        else:
-            return "Please specify how many seconds to set the alarm for."
-    elif "internet speed" in cmd:
-        return skills.get_internet_speed()
-    elif "internet connection" in cmd or "internet availability" in cmd:
-        return skills.check_internet()
-    elif "news" in cmd:
-        return skills.get_news()
-    elif "spell" in cmd:
-        # e.g., "spell the word animal"
-        words = cmd.split()
-        word_to_spell = words[-1]
-        return skills.spell_word(word_to_spell)
+    # 1. Long-term factual memory routing
+    if "remember" in cmd:
+        # Extract key and value from e.g. "remember my favorite color is blue" or "remember that my name is Bharath"
+        clean_cmd = cmd.replace("remember that", "").replace("remember", "").strip()
+        parts = clean_cmd.split(" is ")
+        if len(parts) == 2:
+            return memory.remember(parts[0].strip(), parts[1].strip())
+        return "I didn't catch that. What should I remember?"
+
+    if "what is" in cmd:
+        query = cmd.replace("what is", "").strip()
+        # Check memory first
+        fact = memory.recall(query)
+        if fact:
+            return f"{query} is {fact}."
         
+        # Check if math calculation
+        math_keywords = ["plus", "minus", "times", "divided by", "+", "-", "*", "/"]
+        if any(kw in query for kw in math_keywords) and any(c.isdigit() for c in query):
+            return skills.calculate(query)
+            
+    # 2. General mathematical calculation routing
+    if "calculate" in cmd or "compute" in cmd:
+        expr = cmd.replace("calculate", "").replace("compute", "").strip()
+        return skills.calculate(expr)
+
+    # 3. Keyword-based skill routing
+    SKILL_ROUTES = [
+        ("youtube", lambda c, s: s.open_webpage("youtube")),
+        ("google", lambda c, s: s.open_webpage("google")),
+        ("weather in", lambda c, s: s.get_weather(c.split("weather in")[-1].strip())),
+        ("news", lambda c, s: s.get_news()),
+        ("internet speed", lambda c, s: s.get_internet_speed()),
+        ("screenshot", lambda c, s: s.take_screenshot()),
+        ("volume up", lambda c, s: s.change_volume("up")),
+        ("volume down", lambda c, s: s.change_volume("down")),
+        ("mute", lambda c, s: s.change_volume("mute")),
+        ("unmute", lambda c, s: s.change_volume("unmute")),
+        ("spell", lambda c, s: s.spell_word(c.split()[-1])),
+        ("tell me about", lambda c, s: s.tell_about(c.split("tell me about")[-1].strip())),
+        ("play", lambda c, s: s.play_music(c.replace("play", "").replace("on youtube", "").strip())),
+        ("alarm", lambda c, s: s.set_alarm(int(re.search(r'\d+', c).group())) if re.search(r'\d+', c) else "Please specify how many seconds to set the alarm for."),
+        ("time", lambda c, s: s.get_time_date(c) if len(c.split()) < 5 else None),
+        ("date", lambda c, s: s.get_time_date(c) if len(c.split()) < 5 else None),
+        ("internet connection", lambda c, s: s.check_internet()),
+        ("internet availability", lambda c, s: s.check_internet()),
+        ("open calc", lambda c, s: s.open_libreoffice(c)),
+        ("open writer", lambda c, s: s.open_libreoffice(c)),
+        ("open impress", lambda c, s: s.open_libreoffice(c)),
+        ("open ", lambda c, s: s.open_app(c.replace("open", "").strip())),
+    ]
+
+    for keyword, action in SKILL_ROUTES:
+        if keyword in cmd:
+            res = action(cmd, skills)
+            if res:
+                return res
+                
     return None
 
 def main():
     print("Initializing JARVIS/FRIDAY...")
     voice = VoiceEngine()
-    brain = Brain(model="phi3:latest")
+    brain = Brain(model="llama3.2:3b")
     listener = Listener()
     skills = Skills()
+    memory = Memory()
 
     voice.speak("System is online and ready.")
 
@@ -74,7 +94,7 @@ def main():
                     print(f"Routing Command: {command}")
                     
                     # 3. Check if it's a built-in skill
-                    skill_response = parse_command(command, skills)
+                    skill_response = parse_command(command, skills, memory)
                     
                     if skill_response:
                         voice.speak(skill_response)

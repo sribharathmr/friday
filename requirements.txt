@@ -11,3 +11,5 @@ requests
 speedtest-cli
 pycaw
 feedparser
+pyautogui
+Pillow
